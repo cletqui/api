@@ -1,8 +1,10 @@
 import { OpenAPIHono, z, createRoute } from "@hono/zod-openapi";
+import { query as crtQuery } from "../helpers/crt";
 
-/* CRT */
+export const domain = new OpenAPIHono();
 
-const ParamsSchema = z.object({
+/* CERTS */
+const CertsParamsSchema = z.object({
   domain: z.string({ required_error: "Domain is required." }).openapi({
     param: {
       name: "domain",
@@ -13,7 +15,7 @@ const ParamsSchema = z.object({
   }),
 });
 
-const QuerySchema = z.object({
+const CertsQuerySchema = z.object({
   exclude: z
     .string()
     .optional()
@@ -38,20 +40,7 @@ const QuerySchema = z.object({
     }),
 }); // TODO refactor the parameters and add "limit" parameter
 
-interface CrtResponse {
-  issuer_ca_id: number;
-  issuer_name: string;
-  common_name: string;
-  name_value: string;
-  id: number;
-  entry_timestamp: string | null;
-  not_before: string;
-  not_after: string;
-  serial_number: string;
-  result_count: number;
-}
-
-const CrtResponseSchema = z
+const CertsResponseSchema = z
   .array(
     z.object({
       issuer_ca_id: z.number().openapi({ example: 185752 }),
@@ -84,33 +73,16 @@ const CrtResponseSchema = z
   )
   .openapi("Certificates");
 
-async function query(domain: string): Promise<CrtResponse[]> {
-  const url = `https://crt.sh/?Identity=${domain}&output=json`;
-  console.log(url);
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      accept: "application/json",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch data: ${response.status} ${response.statusText}`
-    );
-  } // TODO handle returned errors
-  return (await response.json()) as CrtResponse[];
-}
-
-const crtRoute = createRoute({
+const certsRoute = createRoute({
   tags: ["Domain"],
   method: "get",
-  path: "/{domain}",
-  request: { params: ParamsSchema, query: QuerySchema },
+  path: "/certs/{domain}",
+  request: { params: CertsParamsSchema, query: CertsQuerySchema },
   responses: {
     200: {
       content: {
         "application/json": {
-          schema: CrtResponseSchema,
+          schema: CertsResponseSchema,
         },
       },
       description: "Fetch crt.sh data",
@@ -120,10 +92,20 @@ const crtRoute = createRoute({
   externalDocs: { description: "crt.sh", url: "https://crt.sh/" },
 });
 
-export const crt = new OpenAPIHono();
-
-crt.openapi(crtRoute, async (c: any) => {
+domain.openapi(certsRoute, async (c: any) => {
+  // TODO fix c type
   const { domain } = c.req.valid("param");
-  const response = await query(domain);
+  const { exclude, deduplicate } = c.req.valid("query");
+  const response = await crtQuery(domain, exclude, deduplicate);
   return c.json(response);
 });
+
+/* SUBDOMAINS */
+
+/* DNS LOOKUP */
+
+/* DNS QUERY */
+
+/* WHOIS */
+
+/* REPUTATION */

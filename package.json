@@ -1,8 +1,8 @@
 {
   "name": "api",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": false,
-  "description": "Cyber API",
+  "description": "cyber API",
   "repository": {
     "type": "github",
     "url": "https://github.com/cletqui/api"
@@ -10,7 +10,7 @@
   "author": {
     "name": "cletqui"
   },
-  "homepage": "https://api.cybai.re/",
+  "homepage": "https://api.cybai.re",
   "license": "MIT",
   "scripts": {
     "dev": "wrangler dev src/index.ts",
@@ -25,6 +25,6 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240403.0",
     "@types/node": "^20.12.6",
-    "wrangler": "^3.57.1"
+    "wrangler": "^3.79.0"
   }
 }
