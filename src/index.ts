@@ -30,11 +30,6 @@ api.get("/", (c) => c.redirect("/docs"));
 /* ROUTES */
 api.route("/domain", domain);
 api.route("/ip", ip);
-// api.route("/dns-query", dnsQuery);
-// api.route("/nslookup", nslookup);
-// api.route("/ipinfo", ipInfo);
-// api.route("/reputation/domain", reputationDomain);
-// api.route("/reputation/ip", reputationIP);
 
 /* SWAGGER */
 api.get("/docs", swaggerUI({ url: "/docs/json" }));

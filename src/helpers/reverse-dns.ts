@@ -103,10 +103,11 @@ const ResponseSchema = z.object({
 }
 */
 
+/* ROUTE */
 export const route = createRoute({
   tags: ["IP"],
   method: "get",
-  path: "/{ip}",
+  path: "/reverse-dns/{ip}",
   request: { params: ParamsSchema },
   responses: {
     // TODO customize error responses (https://github.com/honojs/middleware/tree/main/packages/zod-openapi)

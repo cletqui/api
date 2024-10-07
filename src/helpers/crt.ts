@@ -73,7 +73,7 @@ const QuerySchema = z.object({
     }),
 }); // TODO refactor the parameters and add "limit" parameter
 
-const ResponseSchema = z
+const CertsResponseSchema = z
   .array(
     z.object({
       issuer_ca_id: z.number().openapi({ example: 185752 }),
@@ -106,7 +106,12 @@ const ResponseSchema = z
   )
   .openapi("Certificates");
 
+const SubdomainsResponseSchema = z
+  .array(z.string().openapi({ example: "www.example.com" }))
+  .openapi("Subdomains");
+
 /* ROUTE */
+// CERTIFICATE
 export const route = createRoute({
   tags: ["Domain"],
   method: "get",
@@ -116,7 +121,7 @@ export const route = createRoute({
     200: {
       content: {
         "application/json": {
-          schema: ResponseSchema,
+          schema: CertsResponseSchema,
         },
       },
       description: "Fetch crt.sh data",
@@ -124,4 +129,23 @@ export const route = createRoute({
   },
   description: "Certificate Transparency",
   externalDocs: { description: "crt.sh", url: "https://crt.sh/" },
+});
+
+// SUBDOMAINS
+export const subdomainsRoute = createRoute({
+  tags: ["Domain"],
+  method: "get",
+  path: "/subdomains/{domain}",
+  request: { params: ParamsSchema },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: SubdomainsResponseSchema,
+        },
+      },
+      description: "Search for subdomains",
+    },
+  },
+  description: "Subdomains",
 });

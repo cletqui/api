@@ -1,6 +1,4 @@
-import { OpenAPIHono, z, createRoute } from "@hono/zod-openapi";
-
-/* DNS-QUERY */
+import { z, createRoute } from "@hono/zod-openapi";
 
 const resolvers = {
   cloudflare: "cloudflare-dns.com/dns-query",
@@ -8,6 +6,53 @@ const resolvers = {
   quad9: "dns.quad9.net:5053/dns-query",
 };
 
+/* QUERY */
+interface NSLookupResponse {
+  A: DoHResponse;
+  AAAA: DoHResponse;
+  CNAME: DoHResponse;
+  TXT: DoHResponse;
+  NS: DoHResponse;
+  MX: DoHResponse;
+}
+
+interface DoHResponse {
+  Status: number;
+  TC: boolean;
+  RD: boolean;
+  RA: boolean;
+  AD: boolean;
+  CD: boolean;
+  Question: { name: string; type: number }[];
+  Answer: { name: string; type: number; TTL: number; data: string }[];
+}
+
+export async function query(
+  resolver: keyof typeof resolvers,
+  name: string,
+  type: string = "A",
+  DO: boolean = false,
+  CD: boolean = false
+): Promise<DoHResponse> {
+  const endpoint = resolvers[resolver];
+  const url = `https://${endpoint}?name=${name}${type ? `&type=${type}` : ""}${
+    DO ? `do=${DO}` : ""
+  }${CD ? `$cd=${CD}` : ""}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      accept: "application/dns-json",
+    },
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch data: ${response.status} ${response.statusText}`
+    );
+  } // TODO handle returned errors
+  return (await response.json()) as DoHResponse;
+}
+
+/*SCHEMAS */
 const ParamsSchema = z.object({
   resolver: z.enum(Object.keys(resolvers)).openapi({
     param: {
@@ -60,17 +105,6 @@ const DoHQuerySchema = z.object({
     }),
 });
 
-interface DoHResponse {
-  Status: number;
-  TC: boolean;
-  RD: boolean;
-  RA: boolean;
-  AD: boolean;
-  CD: boolean;
-  Question: { name: string; type: number }[];
-  Answer: { name: string; type: number; TTL: number; data: string }[];
-}
-
 const DoHResponseSchema = z
   .object({
     Status: z.number().openapi({ example: 0 }),
@@ -98,37 +132,22 @@ const DoHResponseSchema = z
   })
   .openapi("DoH Record");
 
-async function query(
-  resolver: keyof typeof resolvers,
-  name: string,
-  type: string = "A",
-  DO: boolean = false,
-  CD: boolean = false
-): Promise<DoHResponse> {
-  const endpoint = resolvers[resolver];
-  const url = `https://${endpoint}?name=${name}${type ? `&type=${type}` : ""}${
-    DO ? `do=${DO}` : ""
-  }${CD ? `$cd=${CD}` : ""}`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      accept: "application/dns-json",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch data: ${response.status} ${response.statusText}`
-    );
-  } // TODO handle returned errors
-  return (await response.json()) as DoHResponse;
-}
+const NSLookupResponseSchema = z
+  .object({
+    A: DoHResponseSchema,
+    AAAA: DoHResponseSchema,
+    CNAME: DoHResponseSchema,
+    TXT: DoHResponseSchema,
+    NS: DoHResponseSchema,
+    MX: DoHResponseSchema,
+  })
+  .openapi("Nslookup");
 
-export const dnsQuery = new OpenAPIHono();
-
-const dnsQueryRoute = createRoute({
+/* ROUTE */
+export const DNSQueryRoute = createRoute({
   tags: ["Domain"],
   method: "get",
-  path: "/{resolver}/{domain}",
+  path: "/dns-query/{resolver}/{domain}",
   request: { params: ParamsSchema, query: DoHQuerySchema },
   responses: {
     // TODO customize error responses (https://github.com/honojs/middleware/tree/main/packages/zod-openapi)
@@ -148,46 +167,17 @@ const dnsQueryRoute = createRoute({
   },
 });
 
-dnsQuery.openapi(dnsQueryRoute, async (c: any) => {
-  const { type, DO, CD } = c.req.valid("query");
-  const { resolver, domain } = c.req.valid("param");
-  const response: DoHResponse = await query(resolver, domain, type, DO, CD);
-  return c.json(response);
-});
-
-/* NSLOOKUP */
-
-interface NslookupResponse {
-  A: DoHResponse;
-  AAAA: DoHResponse;
-  CNAME: DoHResponse;
-  TXT: DoHResponse;
-  NS: DoHResponse;
-  MX: DoHResponse;
-}
-
-const NslookupResponseSchema = z
-  .object({
-    A: DoHResponseSchema,
-    AAAA: DoHResponseSchema,
-    CNAME: DoHResponseSchema,
-    TXT: DoHResponseSchema,
-    NS: DoHResponseSchema,
-    MX: DoHResponseSchema,
-  })
-  .openapi("Nslookup");
-
-const nslookupRoute = createRoute({
+export const NSLookupRoute = createRoute({
   tags: ["Domain"],
   method: "get",
-  path: "/{resolver}/{domain}",
+  path: "/nslookup/{resolver}/{domain}",
   request: { params: ParamsSchema },
   responses: {
     // TODO customize error responses (https://github.com/honojs/middleware/tree/main/packages/zod-openapi)
     200: {
       content: {
         "application/json": {
-          schema: NslookupResponseSchema,
+          schema: NSLookupResponseSchema,
         },
       },
       description: "Fetch DoH Lookup",
@@ -198,20 +188,4 @@ const nslookupRoute = createRoute({
     description: "RFC 8484",
     url: "https://www.rfc-editor.org/rfc/rfc8484",
   },
-});
-
-export const nslookup = new OpenAPIHono();
-
-nslookup.openapi(nslookupRoute, async (c: any) => {
-  const { resolver, domain } = c.req.valid("param");
-  const [A, AAAA, CNAME, TXT, NS, MX] = await Promise.all([
-    query(resolver, domain, "A"),
-    query(resolver, domain, "AAAA"),
-    query(resolver, domain, "CNAME"),
-    query(resolver, domain, "TXT"),
-    query(resolver, domain, "NS"),
-    query(resolver, domain, "MX"),
-  ]);
-  const response: NslookupResponse = { A, AAAA, CNAME, TXT, NS, MX };
-  return c.json(response);
 });

@@ -1,4 +1,4 @@
-import { OpenAPIHono, z, createRoute } from "@hono/zod-openapi";
+import { z, createRoute } from "@hono/zod-openapi";
 
 /* QUERY */
 interface WhoisResponse {} // TODO

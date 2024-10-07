@@ -1,19 +1,7 @@
-import { OpenAPIHono, z, createRoute } from "@hono/zod-openapi";
+import { z, createRoute } from "@hono/zod-openapi";
 
-/* IP INFO */
-
-const ParamsSchema = z.object({
-  ip: z.string({ required_error: "IP is required." }).openapi({
-    param: {
-      name: "ip",
-      in: "path",
-    },
-    example: "162.10.209.81",
-    title: "IP",
-  }),
-});
-
-interface IPInfoResponse {
+/* QUERY */
+interface Response {
   ipVersion: number;
   ipAddress: string;
   latitude: number;
@@ -36,7 +24,35 @@ interface IPInfoResponse {
   tlds: string[];
 }
 
-const IPInfoResponseSchema = z
+export async function query(ip: string): Promise<Response> {
+  const url = `https://freeipapi.com/api/json/${ip}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch data: ${response.status} ${response.statusText}`
+    );
+  } // TODO handle returned errors
+  return (await response.json()) as Response;
+}
+
+/* SCHEMAS */
+const ParamsSchema = z.object({
+  ip: z.string({ required_error: "IP is required." }).openapi({
+    param: {
+      name: "ip",
+      in: "path",
+    },
+    example: "162.10.209.81",
+    title: "IP",
+  }),
+});
+
+const ResponseSchema = z
   .object({
     ipVersion: z.number().openapi({ example: 4 }),
     ipAddress: z.string().openapi({ example: "162.10.209.81" }),
@@ -61,32 +77,17 @@ const IPInfoResponseSchema = z
   })
   .openapi("IP Info");
 
-async function query(ip: string): Promise<IPInfoResponse> {
-  const url = `https://freeipapi.com/api/json/${ip}`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      accept: "application/json",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch data: ${response.status} ${response.statusText}`
-    );
-  } // TODO handle returned errors
-  return (await response.json()) as IPInfoResponse;
-}
-
-const ipInfoRoute = createRoute({
+/* ROUTE */
+export const route = createRoute({
   tags: ["IP"],
   method: "get",
-  path: "/{ip}",
+  path: "/info/{ip}",
   request: { params: ParamsSchema },
   responses: {
     200: {
       content: {
         "application/json": {
-          schema: IPInfoResponseSchema,
+          schema: ResponseSchema,
         },
       },
       description: "Fetch IP info data",
@@ -96,12 +97,4 @@ const ipInfoRoute = createRoute({
     description: "freeipapi.com",
     url: "https://freeipapi.com/",
   },
-});
-
-export const ipInfo = new OpenAPIHono();
-
-ipInfo.openapi(ipInfoRoute, async (c: any) => {
-  const { ip } = c.req.valid("param");
-  const response = await query(ip);
-  return c.json(response);
 });
