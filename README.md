@@ -43,6 +43,8 @@ Cyber API on the go, deploy endpoints for cybersecurity actions.
 - [ ] Implement Spamhaus endpoint for [domains](https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v2/byobject/domain/malakoffhumanis.com/overview) and [IP](https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v1/byobject/cidr/ALL/listings/live/{ip})
 - [ ] Fix the linting issue in `doh.ts`
 - [ ] Add more methods for the endpoints
+- [ ] Implement authentication (JWT, Bearer, Basic...)
+- [ ] When linked with frontends, implement CSRF Protection or IP Restriction
 
 ## Endpoints ideas
 

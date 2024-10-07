@@ -1,18 +1,6 @@
-import { OpenAPIHono, z, createRoute } from "@hono/zod-openapi";
+import { z, createRoute } from "@hono/zod-openapi";
 
-/* REVERSE DNS */
-
-const ParamsSchema = z.object({
-  ip: z.string({ required_error: "IP is required." }).openapi({
-    param: {
-      name: "ip",
-      in: "path",
-    },
-    example: "1.1.1.1",
-    title: "IP",
-  }),
-});
-
+/* QUERY */
 interface ReverseDnsResponse {
   query: {
     timestamp: string;
@@ -31,7 +19,38 @@ interface ReverseDnsResponse {
   detectedDuplicates: [];
 }
 
-const ReverseDnsResponseSchema = z.object({
+export async function query(ip: string): Promise<ReverseDnsResponse> {
+  const url = "https://reversedns.io/api/get-reverse-dns";
+  console.log(url);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+    },
+    body: JSON.stringify({ ips: [ip] }),
+  });
+  console.log(response.ok);
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch data: ${response.status} ${response.statusText}`
+    );
+  } // TODO handle returned errors
+  return (await response.json()) as ReverseDnsResponse;
+}
+
+/* SCHEMAS */
+const ParamsSchema = z.object({
+  ip: z.string({ required_error: "IP is required." }).openapi({
+    param: {
+      name: "ip",
+      in: "path",
+    },
+    example: "1.1.1.1",
+    title: "IP",
+  }),
+});
+
+const ResponseSchema = z.object({
   query: z.object({
     timestamp: z.date().openapi({ example: "2024-05-22T15:47:12.135Z" }),
     overallProcessingTimeMs: z.number().openapi({ example: 114 }),
@@ -84,28 +103,7 @@ const ReverseDnsResponseSchema = z.object({
 }
 */
 
-async function query(ip: string): Promise<ReverseDnsResponse> {
-  const url = "https://reversedns.io/api/get-reverse-dns";
-  console.log(url);
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-    },
-    body: JSON.stringify({ ips: [ip] }),
-  });
-  console.log(response.ok);
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch data: ${response.status} ${response.statusText}`
-    );
-  } // TODO handle returned errors
-  return (await response.json()) as ReverseDnsResponse;
-}
-
-export const reverseDns = new OpenAPIHono();
-
-const reverseDnsRoute = createRoute({
+export const route = createRoute({
   tags: ["IP"],
   method: "get",
   path: "/{ip}",
@@ -115,7 +113,7 @@ const reverseDnsRoute = createRoute({
     200: {
       content: {
         "application/json": {
-          schema: ReverseDnsResponseSchema,
+          schema: ResponseSchema,
         },
       },
       description: "Fetch Reverse DNS Records",
@@ -126,11 +124,4 @@ const reverseDnsRoute = createRoute({
     description: "reversedns.io",
     url: "https://reversedns.io/",
   },
-});
-
-reverseDns.openapi(reverseDnsRoute, async (c: any) => {
-  const { ip } = c.req.valid("param");
-  console.log(ip);
-  const response: ReverseDnsResponse = await query(ip);
-  return c.json(response);
 });

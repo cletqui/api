@@ -1,4 +1,6 @@
 import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import { prettyJSON } from "hono/pretty-json";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { swaggerUI } from "@hono/swagger-ui";
 
@@ -12,35 +14,33 @@ import {
   license,
 } from "../package.json";
 import { domain } from "./endpoints/domain";
-import { dnsQuery, nslookup } from "./endpoints/doh";
-import { whois } from "./endpoints/whois";
-import { ipInfo } from "./endpoints/ipinfo";
-import { reverseDns } from "./endpoints/reverse-dns";
-import { reputationDomain, reputationIP } from "./endpoints/reputation";
+import { ip } from "./endpoints/ip";
 
-const app = new OpenAPIHono();
+/* API */
+const api = new OpenAPIHono();
 
-/* CORS */
-app.use("/*", cors({ origin: "*", allowMethods: ["GET", "POST"] }));
+/* MIDDLEWARES */
+api.use(logger());
+api.use(prettyJSON());
+api.use("/*", cors({ origin: "*", allowMethods: ["GET"] }));
 
 /* ROOT */
-app.get("/", (c) => c.redirect("/docs"));
+api.get("/", (c) => c.redirect("/docs"));
 
 /* ROUTES */
-app.route("/domain", domain);
-app.route("/dns-query", dnsQuery);
-app.route("/nslookup", nslookup);
-app.route("/whois", whois);
-app.route("/ipinfo", ipInfo);
-app.route("/reverse-dns", reverseDns);
-app.route("/reputation/domain", reputationDomain);
-app.route("/reputation/ip", reputationIP);
+api.route("/domain", domain);
+api.route("/ip", ip);
+// api.route("/dns-query", dnsQuery);
+// api.route("/nslookup", nslookup);
+// api.route("/ipinfo", ipInfo);
+// api.route("/reputation/domain", reputationDomain);
+// api.route("/reputation/ip", reputationIP);
 
 /* SWAGGER */
-app.get("/docs", swaggerUI({ url: "/docs/json" }));
+api.get("/docs", swaggerUI({ url: "/docs/json" }));
 
 /* JSON */
-app.doc("/docs/json", {
+api.doc("/docs/json", {
   openapi: "3.0.0",
   info: {
     title: name,
@@ -54,7 +54,7 @@ app.doc("/docs/json", {
       name: license,
     },
   },
-  servers: [{ url: homepage, description: "" }],
+  //  servers: [{ url: homepage, description: "" }],
   tags: [
     {
       name: "Domain",
@@ -67,4 +67,4 @@ app.doc("/docs/json", {
   ],
 });
 
-export default app;
+export default api;
