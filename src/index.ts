@@ -15,6 +15,7 @@ import {
 } from "../package.json";
 import { domain } from "./endpoints/domain";
 import { ip } from "./endpoints/ip";
+import { userAgent } from "./endpoints/user-agent";
 
 /* API */
 const api = new OpenAPIHono();
@@ -30,6 +31,7 @@ api.get("/", (c) => c.redirect("/docs"));
 /* ROUTES */
 api.route("/domain", domain);
 api.route("/ip", ip);
+api.route("/user-agent", userAgent);
 
 /* SWAGGER */
 api.get("/docs", swaggerUI({ url: "/docs/json" }));
@@ -49,7 +51,7 @@ api.doc("/docs/json", {
       name: license,
     },
   },
-  //  servers: [{ url: homepage, description: "" }],
+  servers: [{ url: homepage, description: "" }],
   tags: [
     {
       name: "Domain",

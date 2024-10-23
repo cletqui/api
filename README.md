@@ -41,6 +41,7 @@ Cyber API on the go, deploy endpoints for cybersecurity actions.
 - [ ] Implement [IP Info](https://freeipapi.com/api/json/{ip}) endpoint
 - [ ] Implement [Whois](https://rdap.org/domain/{domain}) endpoint
 - [ ] Implement Spamhaus endpoint for [domains](https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v2/byobject/domain/malakoffhumanis.com/overview) and [IP](https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v1/byobject/cidr/ALL/listings/live/{ip})
+- [ ] Implement CVE API endpoint
 - [ ] Fix the linting issue in `doh.ts`
 - [ ] Add more methods for the endpoints
 - [ ] Implement authentication (JWT, Bearer, Basic...)
