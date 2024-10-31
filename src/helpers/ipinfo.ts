@@ -22,6 +22,7 @@ interface Response {
   org: string;
   as: string;
   asname: string;
+  reverse: string;
   mobile: boolean;
   proxy: boolean;
   hosting: boolean;
