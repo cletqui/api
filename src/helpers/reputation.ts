@@ -1,6 +1,5 @@
 import { z, createRoute } from "@hono/zod-openapi";
 
-
 /* QUERY */
 // DOMAIN
 interface DomainResponse {

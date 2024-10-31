@@ -2,30 +2,33 @@ import { z, createRoute } from "@hono/zod-openapi";
 
 /* QUERY */
 interface Response {
-  ipVersion: number;
-  ipAddress: string;
-  latitude: number;
-  longitude: number;
-  countryName: string;
-  countryCode: string;
-  timeZone: string;
-  zipCode: string;
-  cityName: string;
-  regionName: string;
+  query: string;
+  status: string;
   continent: string;
   continentCode: string;
-  isProxy: boolean;
-  currency: {
-    code: string;
-    name: string;
-  };
-  language: string;
-  timeZones: string[];
-  tlds: string[];
+  country: string;
+  countryCode: string;
+  region: string;
+  regionName: string;
+  city: string;
+  district: string;
+  zip: string;
+  lat: number;
+  lon: number;
+  timezone: string;
+  offset: number;
+  currency: string;
+  isp: string;
+  org: string;
+  as: string;
+  asname: string;
+  mobile: boolean;
+  proxy: boolean;
+  hosting: boolean;
 }
 
 export async function query(ip: string): Promise<Response> {
-  const url = `https://freeipapi.com/api/json/${ip}`;
+  const url = `http://ip-api.com/json/${ip}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,reverse,mobile,proxy,hosting`;
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -47,33 +50,39 @@ const ParamsSchema = z.object({
       name: "ip",
       in: "path",
     },
-    example: "162.10.209.81",
+    example: "1.1.1.1",
     title: "IP",
   }),
 });
 
 const ResponseSchema = z
   .object({
-    ipVersion: z.number().openapi({ example: 4 }),
-    ipAddress: z.string().openapi({ example: "162.10.209.81" }),
-    latitude: z.number().openapi({ example: 48.859077 }),
-    longitude: z.number().openapi({ example: 2.293486 }),
-    countryName: z.string().openapi({ example: "France" }),
-    countryCode: z.string().openapi({ example: "FR" }),
-    timeZone: z.string().openapi({ example: "+01:00" }),
-    zipCode: z.string().openapi({ example: "75000" }),
-    cityName: z.string().openapi({ example: "Paris" }),
-    regionName: z.string().openapi({ example: "Ile-de-France" }),
-    continent: z.string().openapi({ example: "Europe" }),
-    continentCode: z.string().openapi({ example: "EU" }),
-    isProxy: z.boolean().openapi({ example: false }),
-    currency: z.object({
-      code: z.string().openapi({ example: "EUR" }),
-      name: z.string().openapi({ example: "Euro" }),
-    }),
-    language: z.string().openapi({ example: "French" }),
-    timeZones: z.array(z.string().openapi({ example: "Europe/Paris" })),
-    tlds: z.array(z.string().openapi({ example: ".fr" })),
+    query: z.string().openapi({ example: "1.1.1.1" }),
+    status: z.string().openapi({ example: "success" }),
+    continent: z.string().openapi({ example: "Oceania" }),
+    continentCode: z.string().openapi({ example: "OC" }),
+    country: z.string().openapi({ example: "Australia" }),
+    countryCode: z.string().openapi({ example: "AU" }),
+    region: z.string().openapi({ example: "QLD" }),
+    regionName: z.string().openapi({ example: "Queensland" }),
+    city: z.string().openapi({ example: "South Brisbane" }),
+    district: z.string().openapi({ example: "" }),
+    zip: z.string().openapi({ example: "4101" }),
+    lat: z.number().openapi({ example: -27.4766 }),
+    lon: z.number().openapi({ example: 153.0166 }),
+    timeZone: z.string().openapi({ example: "Australia/Brisbane" }),
+    offset: z.number().openapi({ example: 36000 }),
+    currency: z.string().openapi({ example: "AUD" }),
+    isp: z.string().openapi({ example: "Cloudflare, Inc" }),
+    org: z
+      .string()
+      .openapi({ example: "APNIC and Cloudflare DNS Resolver project" }),
+    as: z.string().openapi({ example: "AS13335 Cloudflare, Inc." }),
+    asname: z.string().openapi({ example: "CLOUDFLARENET" }),
+    reverse: z.string().openapi({ example: "one.one.one.one" }),
+    mobile: z.boolean().openapi({ example: false }),
+    proxy: z.boolean().openapi({ example: false }),
+    hosting: z.boolean().openapi({ example: true }),
   })
   .openapi("IP Info");
 
@@ -94,7 +103,7 @@ export const route = createRoute({
     },
   },
   externalDocs: {
-    description: "freeipapi.com",
-    url: "https://freeipapi.com/",
+    description: "ip-api.com", // "freeipapi.com",
+    url: "https://ip-api.com/", // "https://freeipapi.com/",
   },
 });
