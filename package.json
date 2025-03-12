@@ -26,16 +26,16 @@
     "logs": "wrangler tail"
   },
   "dependencies": {
-    "@hono/swagger-ui": "^0.4.1",
-    "@hono/zod-openapi": "^0.16.4",
+    "@hono/swagger-ui": "^0.5.1",
+    "@hono/zod-openapi": "^0.19.2",
     "@types/ua-parser-js": "0.7.39",
-    "hono": "^4.6.8",
-    "ua-parser-js": "2.0.0-rc.1"
+    "hono": "^4.7.4",
+    "ua-parser-js": "2.0.2"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241022.0",
-    "@types/node": "^22.8.5",
-    "wrangler": "^3.84.0"
+    "@cloudflare/workers-types": "^4.20250311.0",
+    "@types/node": "^22.13.10",
+    "wrangler": "^3.114.1"
   },
   "private": false
 }
