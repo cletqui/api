@@ -1,7 +1,8 @@
 import { z, createRoute } from "@hono/zod-openapi";
 
-/* QUERY */
-interface Response {
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface IPInfoResponse {
   query: string;
   status: string;
   continent: string;
@@ -28,31 +29,37 @@ interface Response {
   hosting: boolean;
 }
 
-export async function query(ip: string): Promise<Response> {
-  const url = `http://ip-api.com/json/${ip}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,reverse,mobile,proxy,hosting`;
+// ── Query ──────────────────────────────────────────────────────────────────
+
+export async function query(ip: string): Promise<IPInfoResponse> {
+  const fields = [
+    "status", "message", "continent", "continentCode", "country", "countryCode",
+    "region", "regionName", "city", "district", "zip", "lat", "lon",
+    "timezone", "offset", "currency", "isp", "org", "as", "asname",
+    "reverse", "mobile", "proxy", "hosting",
+  ].join(",");
+  const url = `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=${fields}`;
   const response = await fetch(url, {
     method: "GET",
-    headers: {
-      accept: "application/json",
-    },
+    headers: { accept: "application/json" },
   });
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch data: ${response.status} ${response.statusText}`
+    const err = Object.assign(
+      new Error(`IP lookup failed: ${response.status} ${response.statusText}`),
+      { status: response.status }
     );
-  } // TODO handle returned errors
-  return (await response.json()) as Response;
+    throw err;
+  }
+  return response.json() as Promise<IPInfoResponse>;
 }
 
-/* SCHEMAS */
+// ── Schemas ────────────────────────────────────────────────────────────────
+
 const ParamsSchema = z.object({
-  ip: z.string({ required_error: "IP is required." }).openapi({
-    param: {
-      name: "ip",
-      in: "path",
-    },
+  ip: z.string().openapi({
+    param: { name: "ip", in: "path" },
     example: "1.1.1.1",
-    title: "IP",
+    title: "IP address",
   }),
 });
 
@@ -71,13 +78,11 @@ const ResponseSchema = z
     zip: z.string().openapi({ example: "4101" }),
     lat: z.number().openapi({ example: -27.4766 }),
     lon: z.number().openapi({ example: 153.0166 }),
-    timeZone: z.string().openapi({ example: "Australia/Brisbane" }),
+    timezone: z.string().openapi({ example: "Australia/Brisbane" }),
     offset: z.number().openapi({ example: 36000 }),
     currency: z.string().openapi({ example: "AUD" }),
     isp: z.string().openapi({ example: "Cloudflare, Inc" }),
-    org: z
-      .string()
-      .openapi({ example: "APNIC and Cloudflare DNS Resolver project" }),
+    org: z.string().openapi({ example: "APNIC and Cloudflare DNS Resolver project" }),
     as: z.string().openapi({ example: "AS13335 Cloudflare, Inc." }),
     asname: z.string().openapi({ example: "CLOUDFLARENET" }),
     reverse: z.string().openapi({ example: "one.one.one.one" }),
@@ -85,9 +90,10 @@ const ResponseSchema = z
     proxy: z.boolean().openapi({ example: false }),
     hosting: z.boolean().openapi({ example: true }),
   })
-  .openapi("IP Info");
+  .openapi("IpInfo");
 
-/* ROUTE */
+// ── Route ──────────────────────────────────────────────────────────────────
+
 export const route = createRoute({
   tags: ["IP"],
   method: "get",
@@ -95,16 +101,12 @@ export const route = createRoute({
   request: { params: ParamsSchema },
   responses: {
     200: {
-      content: {
-        "application/json": {
-          schema: ResponseSchema,
-        },
-      },
-      description: "Fetch IP info data",
+      content: { "application/json": { schema: ResponseSchema } },
+      description: "IP geolocation and ASN info",
     },
   },
   externalDocs: {
-    description: "ip-api.com", // "freeipapi.com",
-    url: "https://ip-api.com/", // "https://freeipapi.com/",
+    description: "ip-api.com",
+    url: "https://ip-api.com/",
   },
 });

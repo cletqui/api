@@ -1,123 +1,113 @@
 import { z, createRoute } from "@hono/zod-openapi";
 
-/* QUERY */
+// ── Types ──────────────────────────────────────────────────────────────────
+
 interface ReverseDnsResponse {
   query: {
     timestamp: string;
     overallProcessingTimeMs: number;
     IPv4: number;
-    IPv4_CIDR: [];
-    IPv6_CIDR: [];
+    IPv4_CIDR: string[];
+    IPv6_CIDR: string[];
     IPv4_reverse_found: string;
     IPv6_reverse_found: string;
     detectedBogons: number;
     detectedDuplicates: number;
   };
-  cidrDetails: [];
-  individualIpDetails: { IPv4: {}; IPv6: {} };
-  detectedBogons: [];
-  detectedDuplicates: [];
+  cidrDetails: unknown[];
+  individualIpDetails: {
+    IPv4: Record<string, {
+      originalIp: string;
+      type: string;
+      responsibleNsZone: string;
+      primaryNameServer: string;
+      arpaFormat: string;
+      reverseDns: string;
+      primaryNsProcessingTimeMs: number;
+    }>;
+    IPv6: Record<string, unknown>;
+  };
+  detectedBogons: unknown[];
+  detectedDuplicates: unknown[];
 }
 
+// ── Query ──────────────────────────────────────────────────────────────────
+
 export async function query(ip: string): Promise<ReverseDnsResponse> {
-  const url = "https://reversedns.io/api/get-reverse-dns";
-  console.log(url);
-  const response = await fetch(url, {
+  const response = await fetch("https://reversedns.io/api/get-reverse-dns", {
     method: "POST",
     headers: {
       accept: "application/json",
+      "content-type": "application/json",
     },
     body: JSON.stringify({ ips: [ip] }),
   });
-  console.log(response.ok);
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch data: ${response.status} ${response.statusText}`
+    const err = Object.assign(
+      new Error(`Reverse DNS lookup failed: ${response.status} ${response.statusText}`),
+      { status: response.status }
     );
-  } // TODO handle returned errors
-  return (await response.json()) as ReverseDnsResponse;
+    throw err;
+  }
+  return response.json() as Promise<ReverseDnsResponse>;
 }
 
-/* SCHEMAS */
+// ── Schemas ────────────────────────────────────────────────────────────────
+
 const ParamsSchema = z.object({
-  ip: z.string({ required_error: "IP is required." }).openapi({
-    param: {
-      name: "ip",
-      in: "path",
-    },
+  ip: z.string().openapi({
+    param: { name: "ip", in: "path" },
     example: "1.1.1.1",
-    title: "IP",
+    title: "IP address",
   }),
 });
 
-const ResponseSchema = z.object({
-  query: z.object({
-    timestamp: z.date().openapi({ example: "2024-05-22T15:47:12.135Z" }),
-    overallProcessingTimeMs: z.number().openapi({ example: 114 }),
-    IPv4: z.number().openapi({ example: 1 }),
-    IPv6: z.number().openapi({ example: 0 }),
-    IPv4_CIDR: z.array(z.string()),
-    IPv6_CIDR: z.array(z.string()),
-    IPv4_reverse_found: z.string().openapi({ example: "1 / 1" }),
-    IPv6_reverse_found: z.string().openapi({ example: "0 / 0" }),
-    detectedBogons: z.number().openapi({ example: 0 }),
-    detectedDuplicates: z.number().openapi({ example: 0 }),
-  }),
-  cidrDetails: z.array(z.null()).openapi({ example: [] }),
-  individualIpDetails: z.object({
-    IPv4: z.object({}),
-  }),
-}); // TODO complete this schema with the example below
+const ResponseSchema = z
+  .object({
+    query: z.object({
+      timestamp: z.string().openapi({ example: "2024-05-22T15:47:12.135Z" }),
+      overallProcessingTimeMs: z.number().openapi({ example: 114 }),
+      IPv4: z.number().openapi({ example: 1 }),
+      IPv6: z.number().openapi({ example: 0 }),
+      IPv4_CIDR: z.array(z.string()),
+      IPv6_CIDR: z.array(z.string()),
+      IPv4_reverse_found: z.string().openapi({ example: "1 / 1" }),
+      IPv6_reverse_found: z.string().openapi({ example: "0 / 0" }),
+      detectedBogons: z.number().openapi({ example: 0 }),
+      detectedDuplicates: z.number().openapi({ example: 0 }),
+    }),
+    cidrDetails: z.array(z.unknown()),
+    individualIpDetails: z.object({
+      IPv4: z.record(
+        z.string(),
+        z.object({
+          originalIp: z.string().openapi({ example: "1.1.1.1" }),
+          type: z.string().openapi({ example: "IPv4" }),
+          responsibleNsZone: z.string().openapi({ example: "1.1.1.in-addr.arpa" }),
+          primaryNameServer: z.string().openapi({ example: "alec.ns.cloudflare.com" }),
+          arpaFormat: z.string().openapi({ example: "1.1.1.1.in-addr.arpa" }),
+          reverseDns: z.string().openapi({ example: "one.one.one.one" }),
+          primaryNsProcessingTimeMs: z.number().openapi({ example: 112 }),
+        })
+      ),
+      IPv6: z.record(z.string(), z.unknown()),
+    }),
+    detectedBogons: z.array(z.unknown()),
+    detectedDuplicates: z.array(z.unknown()),
+  })
+  .openapi("ReverseDns");
 
-/*
-{
-  "query": {
-    "timestamp": "2024-05-22T15:47:12.135Z",
-    "overallProcessingTimeMs": 114,
-    "IPv4": 1,
-    "IPv6": 0,
-    "IPv4_CIDR": [],
-    "IPv6_CIDR": [],
-    "IPv4_reverse_found": "1 / 1",
-    "IPv6_reverse_found": "0 / 0",
-    "detectedBogons": 0,
-    "detectedDuplicates": 0
-  },
-  "cidrDetails": [],
-  "individualIpDetails": {
-    "IPv4": {
-      "1.1.1.1": {
-        "originalIp": "1.1.1.1",
-        "type": "IPv4",
-        "responsibleNsZone": "1.1.1.in-addr.arpa",
-        "primaryNameServer": "alec.ns.cloudflare.com",
-        "arpaFormat": "1.1.1.1.in-addr.arpa",
-        "reverseDns": "one.one.one.one",
-        "primaryNsProcessingTimeMs": 112
-      }
-    },
-    "IPv6": {}
-  },
-  "detectedBogons": [],
-  "detectedDuplicates": []
-}
-*/
+// ── Route ──────────────────────────────────────────────────────────────────
 
-/* ROUTE */
 export const route = createRoute({
   tags: ["IP"],
   method: "get",
   path: "/reverse-dns/{ip}",
   request: { params: ParamsSchema },
   responses: {
-    // TODO customize error responses (https://github.com/honojs/middleware/tree/main/packages/zod-openapi)
     200: {
-      content: {
-        "application/json": {
-          schema: ResponseSchema,
-        },
-      },
-      description: "Fetch Reverse DNS Records",
+      content: { "application/json": { schema: ResponseSchema } },
+      description: "Reverse DNS lookup result",
     },
   },
   description: "Reverse DNS",

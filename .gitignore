@@ -22,3 +22,6 @@ dist
 yarn.lock
 pnpm-lock.yaml
 bun.lockb
+
+# Local AI context — keep private, not for remote
+CLAUDE.md
