@@ -13,55 +13,121 @@ import {
   homepage,
   license,
 } from "../package.json";
-import { domain } from "./endpoints/domain";
-import { ip } from "./endpoints/ip";
-import { userAgent } from "./endpoints/user-agent";
 
-/* API */
-const api = new OpenAPIHono();
+import { domain } from "./routes/cyber/domain";
+import { ip } from "./routes/cyber/ip";
+import { ua } from "./routes/cyber/ua";
+import { cve } from "./routes/cyber/cve";
+import { asn } from "./routes/cyber/asn";
+import { tide } from "./routes/data/tide";
+import { weather } from "./routes/data/weather";
+import { apero } from "./routes/data/apero";
+import { fetchHarboursData } from "./scrapers/maree-info";
+import { updateHarbourDatabase } from "./services/harbour";
+import type { CloudflareEnv } from "./types";
+
+// Origins allowed to call the /data/* endpoints (tide, weather, apero)
+const DATA_ORIGINS = [
+  "https://tide.cybai.re",
+  "https://tide.pages.dev",
+  "https://cletqui.github.io/tide",
+  "https://apero.cybai.re",
+  "https://apero.pages.dev",
+  "https://cletqui.github.io/apero",
+];
+
+/* APP */
+const app = new OpenAPIHono<{ Bindings: CloudflareEnv }>();
 
 /* MIDDLEWARES */
-api.use(logger());
-api.use(prettyJSON());
-api.use("/*", cors({ origin: "*", allowMethods: ["GET"] }));
+app.use("*", logger());
+app.use("*", prettyJSON());
+
+// /cyber/* — open CORS (public API)
+app.use("/cyber/*", cors({ origin: "*", allowMethods: ["GET"] }));
+
+// /data/* — restricted to known frontends
+app.use(
+  "/data/*",
+  cors({
+    origin: (origin) => (DATA_ORIGINS.includes(origin) ? origin : null),
+    allowMethods: ["GET"],
+    allowHeaders: ["Content-Type"],
+    maxAge: 86400,
+  })
+);
+
+/* ERROR HANDLER */
+app.onError((err: any, c) => {
+  const status = err.status ?? 500;
+  console.error(`[${status}] ${err.message}`);
+  return c.text(err.message, status);
+});
 
 /* ROOT */
-api.get("/", (c) => c.redirect("/docs"));
+app.get("/", (c) => c.redirect("/docs", 301));
 
-/* ROUTES */
-api.route("/domain", domain);
-api.route("/ip", ip);
-api.route("/user-agent", userAgent);
+/* CYBER ROUTES */
+app.route("/cyber/domain", domain);
+app.route("/cyber/ip", ip);
+app.route("/cyber/ua", ua);
+app.route("/cyber/cve", cve);
+app.route("/cyber/asn", asn);
 
-/* SWAGGER */
-api.get("/docs", swaggerUI({ url: "/docs/json" }));
+/* DATA ROUTES */
+app.route("/data", tide);
+app.route("/data", weather);
+app.route("/data", apero);
 
-/* JSON */
-api.doc("/docs/json", {
+/* DOCS */
+app.get("/docs", swaggerUI({ url: "/docs/json" }));
+
+app.doc("/docs/json", {
   openapi: "3.0.0",
   info: {
     title: name,
     version: version,
-    description: `[${description}](${homepage}) - [${repository.type}](${repository.url})`,
+    description: `[${description}](${homepage}) — [${repository.type}](${repository.url})`,
     contact: {
       name: author.name,
       url: `${repository.url}/issues`,
     },
-    license: {
-      name: license,
-    },
+    license: { name: license },
   },
-  servers: [{ url: homepage, description: "" }],
+  servers: [{ url: homepage, description: "Production" }],
   tags: [
-    {
-      name: "Domain",
-      description: "Domain Info",
-    },
-    {
-      name: "IP",
-      description: "IP Info",
-    },
+    { name: "Domain", description: "Domain information (certs, DNS, WHOIS, reputation)" },
+    { name: "IP", description: "IP information (geolocation, reverse DNS, reputation)" },
+    { name: "User-Agent", description: "User-Agent parsing" },
+    { name: "CVE", description: "CVE / vulnerability lookup" },
+    { name: "ASN", description: "Autonomous System Number intel (BGPView)" },
+    { name: "Tide", description: "French harbour tide data (maree.info)" },
+    { name: "Weather", description: "Weather data (wttr.in)" },
+    { name: "Apero", description: "Global apéritif customs by timezone" },
   ],
 });
 
-export default api;
+/* EXPORT */
+export default {
+  fetch: app.fetch,
+
+  /**
+   * Cron trigger — runs daily at 3am UTC.
+   * Re-scrapes the maree.info harbour list and syncs any additions or name
+   * changes to D1. Tide data itself is cached per-harbour in KV on demand.
+   */
+  async scheduled(
+    _event: ScheduledEvent,
+    env: CloudflareEnv,
+    _ctx: ExecutionContext
+  ): Promise<void> {
+    console.log("Cron: syncing harbour registry...");
+    try {
+      const harbourData = await fetchHarboursData();
+      await updateHarbourDatabase(harbourData, env);
+      console.log("Cron: harbour registry synced.");
+    } catch (err) {
+      console.error("Cron: sync failed:", err);
+    }
+  },
+};

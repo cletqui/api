@@ -4,17 +4,9 @@ const resolvers = {
   cloudflare: "cloudflare-dns.com/dns-query",
   google: "dns.google/resolve",
   quad9: "dns.quad9.net:5053/dns-query",
-};
+} as const;
 
-/* QUERY */
-interface NSLookupResponse {
-  A: DoHResponse;
-  AAAA: DoHResponse;
-  CNAME: DoHResponse;
-  TXT: DoHResponse;
-  NS: DoHResponse;
-  MX: DoHResponse;
-}
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface DoHResponse {
   Status: number;
@@ -27,6 +19,8 @@ interface DoHResponse {
   Answer: { name: string; type: number; TTL: number; data: string }[];
 }
 
+// ── Query ──────────────────────────────────────────────────────────────────
+
 export async function query(
   resolver: keyof typeof resolvers,
   name: string,
@@ -35,74 +29,56 @@ export async function query(
   CD: boolean = false
 ): Promise<DoHResponse> {
   const endpoint = resolvers[resolver];
-  const url = `https://${endpoint}?name=${name}${type ? `&type=${type}` : ""}${
-    DO ? `do=${DO}` : ""
-  }${CD ? `$cd=${CD}` : ""}`;
+  const params = new URLSearchParams({ name, type });
+  if (DO) params.set("do", "true");
+  if (CD) params.set("cd", "true");
+
+  const url = `https://${endpoint}?${params.toString()}`;
   const response = await fetch(url, {
     method: "GET",
-    headers: {
-      accept: "application/dns-json",
-    },
+    headers: { accept: "application/dns-json" },
   });
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch data: ${response.status} ${response.statusText}`
+    const err = Object.assign(
+      new Error(`DoH query failed: ${response.status} ${response.statusText}`),
+      { status: response.status }
     );
-  } // TODO handle returned errors
-  return (await response.json()) as DoHResponse;
+    throw err;
+  }
+  return response.json() as Promise<DoHResponse>;
 }
 
-/*SCHEMAS */
+// ── Schemas ────────────────────────────────────────────────────────────────
+
 const ParamsSchema = z.object({
-  resolver: z.enum(Object.keys(resolvers)).openapi({
-    param: {
-      name: "resolver",
-      in: "path",
-    },
+  resolver: z.enum(Object.keys(resolvers) as [string, ...string[]]).openapi({
+    param: { name: "resolver", in: "path" },
     example: "cloudflare",
     title: "Resolver",
   }),
-  domain: z.string({ required_error: "Domain name is required." }).openapi({
-    param: {
-      name: "domain",
-      in: "path",
-    },
+  domain: z.string().openapi({
+    param: { name: "domain", in: "path" },
     example: "example.com",
     title: "Domain name",
   }),
 });
 
 const DoHQuerySchema = z.object({
-  type: z
-    .string()
-    .optional()
-    .default("A")
-    .openapi({
-      param: {
-        name: "type",
-        in: "query",
-      },
-      example: "A",
-      title: "Query type",
-    }),
-  DO: z
-    .boolean()
-    .optional()
-    .default(false)
-    .openapi({
-      param: { name: "DO", in: "query" },
-      example: false,
-      title: "DO bit (DNSSEC data)",
-    }),
-  CD: z
-    .boolean()
-    .optional()
-    .default(false)
-    .openapi({
-      param: { name: "CD", in: "query" },
-      example: false,
-      title: "CD bit (disable validation)",
-    }),
+  type: z.string().optional().default("A").openapi({
+    param: { name: "type", in: "query" },
+    example: "A",
+    title: "Query type",
+  }),
+  DO: z.boolean().optional().default(false).openapi({
+    param: { name: "DO", in: "query" },
+    example: false,
+    title: "DO bit (DNSSEC data)",
+  }),
+  CD: z.boolean().optional().default(false).openapi({
+    param: { name: "CD", in: "query" },
+    example: false,
+    title: "CD bit (disable validation)",
+  }),
 });
 
 const DoHResponseSchema = z
@@ -124,13 +100,11 @@ const DoHResponseSchema = z
         name: z.string().openapi({ example: "example.com." }),
         type: z.number().openapi({ example: 28 }),
         TTL: z.number().openapi({ example: 1726 }),
-        data: z
-          .string()
-          .openapi({ example: "2606:2800:220:1:248:1893:25c8:1946" }),
+        data: z.string().openapi({ example: "2606:2800:220:1:248:1893:25c8:1946" }),
       })
     ),
   })
-  .openapi("DoH Record");
+  .openapi("DoHRecord");
 
 const NSLookupResponseSchema = z
   .object({
@@ -141,26 +115,22 @@ const NSLookupResponseSchema = z
     NS: DoHResponseSchema,
     MX: DoHResponseSchema,
   })
-  .openapi("Nslookup");
+  .openapi("NsLookup");
 
-/* ROUTE */
+// ── Routes ─────────────────────────────────────────────────────────────────
+
 export const DNSQueryRoute = createRoute({
   tags: ["Domain"],
   method: "get",
   path: "/dns-query/{resolver}/{domain}",
   request: { params: ParamsSchema, query: DoHQuerySchema },
   responses: {
-    // TODO customize error responses (https://github.com/honojs/middleware/tree/main/packages/zod-openapi)
     200: {
-      content: {
-        "application/json": {
-          schema: DoHResponseSchema,
-        },
-      },
-      description: "Fetch DoH Records",
+      content: { "application/json": { schema: DoHResponseSchema } },
+      description: "DNS-over-HTTPS query result",
     },
   },
-  description: "DNS over HTTPs",
+  description: "DNS over HTTPS (DoH) single record type query",
   externalDocs: {
     description: "RFC 8484",
     url: "https://www.rfc-editor.org/rfc/rfc8484",
@@ -173,17 +143,12 @@ export const NSLookupRoute = createRoute({
   path: "/nslookup/{resolver}/{domain}",
   request: { params: ParamsSchema },
   responses: {
-    // TODO customize error responses (https://github.com/honojs/middleware/tree/main/packages/zod-openapi)
     200: {
-      content: {
-        "application/json": {
-          schema: NSLookupResponseSchema,
-        },
-      },
-      description: "Fetch DoH Lookup",
+      content: { "application/json": { schema: NSLookupResponseSchema } },
+      description: "Full NS lookup (A, AAAA, CNAME, TXT, NS, MX)",
     },
   },
-  description: "DNS over HTTPs",
+  description: "DNS over HTTPS (DoH) full nslookup",
   externalDocs: {
     description: "RFC 8484",
     url: "https://www.rfc-editor.org/rfc/rfc8484",

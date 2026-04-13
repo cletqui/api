@@ -1,56 +1,173 @@
-# API
+# api.cybai.re
 
-## Table of Contents
+A single Cloudflare Worker serving two categories of public endpoints:
 
-- [API](#api)
-  - [Table of Contents](#table-of-contents)
-  - [Motivation](#motivation)
-  - [URLs](#urls)
-    - [Swagger](#swagger)
-    - [Endpoints](#endpoints)
-  - [Roadmap](#roadmap)
-  - [Endpoints ideas](#endpoints-ideas)
+- **`/cyber/*`** — cybersecurity intelligence: domain info, IP info, ASN, CVE lookup, user-agent parsing
+- **`/data/*`** — French tide data, weather, and apéritif customs
 
-## Motivation
+**Base URL:** `https://api.cybai.re`  
+**Docs:** [`/docs`](https://api.cybai.re/docs) (Swagger UI) · [`/docs/json`](https://api.cybai.re/docs/json) (OpenAPI JSON)
 
-Cyber API on the go, deploy endpoints for cybersecurity actions.
+---
 
-## URLs
+## Cyber endpoints
 
-[api.cybai.re](https://api.cybai.re/)
+All `/cyber/*` endpoints return JSON and allow any origin (`Access-Control-Allow-Origin: *`).
 
-### Swagger
+### Domain
 
-[Swagger](https://api.cybai.re/swagger)
-[Swagger JSON](https://api.cybai.re/swagger/json)
+| Method | Path | Description | Source |
+|--------|------|-------------|--------|
+| `GET` | `/cyber/domain/certs/{domain}` | Certificate transparency records | [crt.sh](https://crt.sh) |
+| `GET` | `/cyber/domain/subdomains/{domain}` | Subdomain enumeration via CT logs | [crt.sh](https://crt.sh) |
+| `GET` | `/cyber/domain/dns-query/{resolver}/{domain}` | DNS-over-HTTPS single record query | Cloudflare / Google / Quad9 |
+| `GET` | `/cyber/domain/nslookup/{resolver}/{domain}` | Full NS lookup (A, AAAA, CNAME, TXT, NS, MX) | Cloudflare / Google / Quad9 |
+| `GET` | `/cyber/domain/whois/{domain}` | RDAP/WHOIS registration data | [rdap.org](https://rdap.org) |
+| `GET` | `/cyber/domain/reputation/{domain}` | Threat score, tags, abuse indicators | [Spamhaus](https://www.spamhaus.org) |
+| `GET` | `/cyber/domain/mail-security/{domain}` | SPF, DMARC, DKIM, MX analysis | DoH (Cloudflare) |
+| `GET` | `/cyber/domain/threat/{domain}` | Malware distribution history | [URLhaus](https://urlhaus.abuse.ch) |
+| `GET` | `/cyber/domain/url/threat?url=` | Specific URL threat check | [URLhaus](https://urlhaus.abuse.ch) |
 
-### Endpoints
+**DNS resolvers:** `cloudflare` · `google` · `quad9`
 
-    /dns-query: DNS records
-    /certs : Certificate Transparency
-    /ipinfo: Fetch IP information
-    /whois: Fetch IP/domain whois information
+```bash
+# Certificate transparency
+curl "https://api.cybai.re/cyber/domain/certs/example.com?exclude=expired&deduplicate=Y"
 
-## Roadmap
+# Full NS lookup via Cloudflare DoH
+curl "https://api.cybai.re/cyber/domain/nslookup/cloudflare/example.com"
 
-- [x] Add more DoH resolvers to resolvers.json
-- [ ] Improve `README.md`
-- [ ] Handle errors returned by DoH or crt.sh
-- [ ] Validation based on { content: `application/json` } header
-- [ ] Add more parameters for CRT ("limit" to limit the number of certificates returned)
-- [ ] Implement [IP Info](https://freeipapi.com/api/json/{ip}) endpoint
-- [ ] Implement [Whois](https://rdap.org/domain/{domain}) endpoint
-- [ ] Implement Spamhaus endpoint for [domains](https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v2/byobject/domain/malakoffhumanis.com/overview) and [IP](https://www.spamhaus.org/api/v1/sia-proxy/api/intel/v1/byobject/cidr/ALL/listings/live/{ip})
-- [ ] Implement CVE API endpoint
-- [ ] Fix the linting issue in `doh.ts`
-- [ ] Add more methods for the endpoints
-- [ ] Implement authentication (JWT, Bearer, Basic...)
-- [ ] When linked with frontends, implement CSRF Protection or IP Restriction
+# Email security check
+curl "https://api.cybai.re/cyber/domain/mail-security/example.com"
 
-## Endpoints ideas
+# URLhaus malware check
+curl "https://api.cybai.re/cyber/domain/threat/example.com"
+curl "https://api.cybai.re/cyber/domain/url/threat?url=http://malicious.example.com/payload.exe"
+```
 
-Web Related Endpoints
+### IP
 
-    /header: Fetch website header
-    /pages: Fetch all website pages
-    /ping: Ping domain to check latency and status
+| Method | Path | Description | Source |
+|--------|------|-------------|--------|
+| `GET` | `/cyber/ip/info/{ip}` | Geolocation, ISP, ASN, mobile/proxy/hosting flags | [ip-api.com](https://ip-api.com) |
+| `GET` | `/cyber/ip/reverse-dns/{ip}` | Reverse DNS lookup | [reversedns.io](https://reversedns.io) |
+| `GET` | `/cyber/ip/reputation/{ip}` | Blocklist listings (XBL, SBL, DBL…) | [Spamhaus](https://www.spamhaus.org) |
+| `GET` | `/cyber/ip/threat/{ip}` | Malware distribution history | [URLhaus](https://urlhaus.abuse.ch) |
+
+```bash
+curl "https://api.cybai.re/cyber/ip/info/1.1.1.1"
+curl "https://api.cybai.re/cyber/ip/reputation/1.1.1.1"
+curl "https://api.cybai.re/cyber/ip/threat/1.2.3.4"
+```
+
+### ASN
+
+| Method | Path | Description | Source |
+|--------|------|-------------|--------|
+| `GET` | `/cyber/asn/{asn}` | ASN name, country, abuse contacts, RIR allocation | [BGPView](https://bgpview.io) |
+| `GET` | `/cyber/asn/{asn}/prefixes` | IPv4/IPv6 prefix list for the ASN | [BGPView](https://bgpview.io) |
+
+The `{asn}` parameter accepts `13335` or `AS13335`.
+
+```bash
+curl "https://api.cybai.re/cyber/asn/AS13335"
+curl "https://api.cybai.re/cyber/asn/AS13335/prefixes"
+```
+
+### CVE
+
+| Method | Path | Description | Source |
+|--------|------|-------------|--------|
+| `GET` | `/cyber/cve/{id}` | Full CVE record | [MITRE CVE API](https://www.cve.org) |
+
+```bash
+curl "https://api.cybai.re/cyber/cve/CVE-2021-44228"
+```
+
+### User-Agent
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/cyber/ua?ua=` | Parse a user-agent string (falls back to request `User-Agent` header) |
+
+```bash
+curl "https://api.cybai.re/cyber/ua?ua=Mozilla/5.0+..."
+# or let the API read your own UA:
+curl "https://api.cybai.re/cyber/ua"
+```
+
+---
+
+## Data endpoints
+
+`/data/*` endpoints are restricted to known frontend origins (`tide.cybai.re`, `apero.cybai.re`, and their GitHub Pages mirrors).
+
+### Tide
+
+French harbour tide data scraped from [maree.info](https://maree.info). Raw data is cached in Cloudflare KV for 12 hours; `last_tide` / `next_tide` are always computed fresh.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/data/tide?harbour={name}` | Tide data for a harbour by name |
+| `GET` | `/data/tide?id={id}` | Tide data for a harbour by maree.info ID |
+| `GET` | `/data/tide/harbours` | Full harbour list (`id → name`) |
+| `GET` | `/data/tide/harbours?name={name}` | Search harbour by name |
+| `GET` | `/data/tide/harbours?id={id}` | Search harbour by ID |
+| `GET` | `/data/tide/harbours?refresh` | Force-sync the D1 harbour registry from maree.info |
+
+Response includes `forecast` (today), `last_tide`, `next_tide`, and a full `data` map for the week.
+
+### Weather
+
+| Method | Path | Description | Source |
+|--------|------|-------------|--------|
+| `GET` | `/data/weather?location={city}` | Weather data in wttr.in j1 format | [wttr.in](https://wttr.in) |
+
+If `location` is omitted, falls back to Cloudflare geolocation (`cf.city`).
+
+### Apéro
+
+Global apéritif customs by timezone (~200 timezones covered).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/data/apero` | Full dataset keyed by continent and city |
+| `GET` | `/data/apero?timezone=Europe/Paris` | Single timezone entry |
+
+---
+
+## Architecture
+
+Built on [Cloudflare Workers](https://workers.cloudflare.com) with [Hono](https://hono.dev) and [zod-openapi](https://github.com/honojs/middleware/tree/main/packages/zod-openapi).
+
+```
+src/
+  routes/cyber/     domain  ip  ua  cve  asn
+  routes/data/      tide  weather  apero
+  helpers/          cyber fetchers + Zod/OpenAPI schemas
+  services/         tide KV cache, harbour D1 registry, weather
+  scrapers/         maree-info.ts  wttr-in.ts
+  types/            CloudflareEnv, tide types
+  data/             apero.json (~200 KB static dataset)
+```
+
+**Cloudflare bindings:**
+- `DB` — D1 database (`data-db`): harbour registry
+- `TIDE_KV` — KV namespace: 12h tide data cache + 24h last-tide fallback
+
+**Cron:** `0 3 * * *` — nightly harbour registry sync from maree.info
+
+## Running locally
+
+```bash
+npm install
+npm run dev                          # local dev server at localhost:8787
+npx wrangler dev --remote            # dev against real D1 + KV bindings
+curl "localhost:8787/__scheduled?cron=0+3+*+*+*"  # trigger cron manually
+npm run typecheck                    # TypeScript type check
+npm run deploy                       # deploy to Cloudflare
+```
+
+## License
+
+[MIT](LICENSE)

@@ -1,8 +1,21 @@
 name = "api"
 main = "src/index.ts"
-compatibility_date = "2023-12-01"
+compatibility_date = "2024-09-23"
 minify = true
 assets = { directory = "public" }
 
 [observability]
 enabled = true
+
+[triggers]
+crons = ["0 3 * * *"]
+
+[[kv_namespaces]]
+binding = "TIDE_KV"
+id = "c4d11dd2c6a94bc0ad61107056a41c51"
+preview_id = "36e22bb27cfe47bf90af07604c577e3a"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "data-db"
+database_id = "f47c5e97-a6ae-4dcd-abb5-1eeb708e3018"
