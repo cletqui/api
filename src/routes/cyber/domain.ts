@@ -14,15 +14,44 @@ import {
   query as mailSecurityQuery,
   route as mailSecurityRoute,
 } from "../../helpers/mail-security";
+import {
+  domainQuery as whoisQuery,
+  domainRoute as whoisRoute,
+} from "../../helpers/whois";
 
 export const domain = new OpenAPIHono();
 
-/* CERTS */
+/* WHOIS */
+domain.openapi(whoisRoute, async (c: any) => {
+  const { domain } = c.req.valid("param");
+  try {
+    return c.json(await whoisQuery(domain));
+  } catch (err: any) {
+    return c.text(err.message, err.status ?? 500);
+  }
+});
+
+/* CERTS — queries both the domain and %.domain, returns combined results */
 domain.openapi(crtRoute, async (c: any) => {
   const { domain } = c.req.valid("param");
   const { exclude, deduplicate } = c.req.valid("query");
-  const response = await crtQuery(domain, exclude, deduplicate);
-  return c.json(response);
+  const [exact, wildcard] = await Promise.allSettled([
+    crtQuery(domain, exclude, deduplicate),
+    crtQuery(`%.${domain}`, exclude, deduplicate),
+  ]);
+  if (exact.status === "rejected" && wildcard.status === "rejected") {
+    return c.text(`crt.sh lookup failed: ${exact.reason?.message}`, 500);
+  }
+  const all = [
+    ...(exact.status === "fulfilled" ? exact.value : []),
+    ...(wildcard.status === "fulfilled" ? wildcard.value : []),
+  ];
+  const seen = new Set<number>();
+  return c.json(all.filter((cert) => {
+    if (seen.has(cert.id)) return false;
+    seen.add(cert.id);
+    return true;
+  }));
 });
 
 /* SUBDOMAINS */
