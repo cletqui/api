@@ -10,21 +10,10 @@ import {
   route as crtRoute,
   subdomainsRoute,
 } from "../../helpers/crt";
-import { query as whoisQuery, route as whoisRoute } from "../../helpers/whois";
-import {
-  domainQuery as reputationQuery,
-  domainRoute as reputationRoute,
-} from "../../helpers/reputation";
 import {
   query as mailSecurityQuery,
   route as mailSecurityRoute,
 } from "../../helpers/mail-security";
-import {
-  queryHost as urlhausHostQuery,
-  queryUrl as urlhausUrlQuery,
-  domainThreatRoute,
-  urlThreatRoute,
-} from "../../helpers/urlhaus";
 
 export const domain = new OpenAPIHono();
 
@@ -69,21 +58,14 @@ domain.openapi(NSLookupRoute, async (c: any) => {
     DoHQuery(resolver, domain, "NS"),
     DoHQuery(resolver, domain, "MX"),
   ]);
-  return c.json({ A, AAAA, CNAME, TXT, NS, MX });
-});
-
-/* WHOIS */
-domain.openapi(whoisRoute, async (c: any) => {
-  const { domain } = c.req.valid("param");
-  const response = await whoisQuery(domain);
-  return c.json(response);
-});
-
-/* REPUTATION */
-domain.openapi(reputationRoute, async (c: any) => {
-  const { domain } = c.req.valid("param");
-  const response = await reputationQuery(domain);
-  return c.json(response);
+  return c.json({
+    A: A.Answer ?? [],
+    AAAA: AAAA.Answer ?? [],
+    CNAME: CNAME.Answer ?? [],
+    TXT: TXT.Answer ?? [],
+    NS: NS.Answer ?? [],
+    MX: MX.Answer ?? [],
+  });
 });
 
 /* MAIL SECURITY */
@@ -91,26 +73,6 @@ domain.openapi(mailSecurityRoute, async (c: any) => {
   const { domain } = c.req.valid("param");
   try {
     return c.json(await mailSecurityQuery(domain));
-  } catch (err: any) {
-    return c.text(err.message, err.status ?? 500);
-  }
-});
-
-/* DOMAIN THREAT (URLhaus) */
-domain.openapi(domainThreatRoute, async (c: any) => {
-  const { domain } = c.req.valid("param");
-  try {
-    return c.json(await urlhausHostQuery(domain));
-  } catch (err: any) {
-    return c.text(err.message, err.status ?? 500);
-  }
-});
-
-/* URL THREAT (URLhaus) */
-domain.openapi(urlThreatRoute, async (c: any) => {
-  const { url } = c.req.valid("query");
-  try {
-    return c.json(await urlhausUrlQuery(url));
   } catch (err: any) {
     return c.text(err.message, err.status ?? 500);
   }

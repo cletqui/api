@@ -1,55 +1,30 @@
 import { z, createRoute } from "@hono/zod-openapi";
-
-// ── Types ──────────────────────────────────────────────────────────────────
-
-interface ReverseDnsResponse {
-  query: {
-    timestamp: string;
-    overallProcessingTimeMs: number;
-    IPv4: number;
-    IPv4_CIDR: string[];
-    IPv6_CIDR: string[];
-    IPv4_reverse_found: string;
-    IPv6_reverse_found: string;
-    detectedBogons: number;
-    detectedDuplicates: number;
-  };
-  cidrDetails: unknown[];
-  individualIpDetails: {
-    IPv4: Record<string, {
-      originalIp: string;
-      type: string;
-      responsibleNsZone: string;
-      primaryNameServer: string;
-      arpaFormat: string;
-      reverseDns: string;
-      primaryNsProcessingTimeMs: number;
-    }>;
-    IPv6: Record<string, unknown>;
-  };
-  detectedBogons: unknown[];
-  detectedDuplicates: unknown[];
-}
+import { query as dohQuery } from "./doh";
 
 // ── Query ──────────────────────────────────────────────────────────────────
 
-export async function query(ip: string): Promise<ReverseDnsResponse> {
-  const response = await fetch("https://reversedns.io/api/get-reverse-dns", {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ ips: [ip] }),
-  });
-  if (!response.ok) {
-    const err = Object.assign(
-      new Error(`Reverse DNS lookup failed: ${response.status} ${response.statusText}`),
-      { status: response.status }
-    );
-    throw err;
+function toArpa(ip: string): string {
+  const parts = ip.split(".");
+  if (parts.length === 4) {
+    return `${parts[3]}.${parts[2]}.${parts[1]}.${parts[0]}.in-addr.arpa`;
   }
-  return response.json() as Promise<ReverseDnsResponse>;
+  // IPv6: expand and reverse nibbles
+  const full = ip.replace(/::/, (_, offset) => {
+    const missing = 8 - (ip.replace(/::/g, ":").split(":").length - 1);
+    return ":0000".repeat(missing).slice(1) + (offset + 2 < ip.length ? ":" : "");
+  }).split(":").map(g => g.padStart(4, "0")).join("");
+  return full.split("").reverse().join(".") + ".ip6.arpa";
+}
+
+export async function query(ip: string): Promise<{ ip: string; reverse_dns: string[] }> {
+  try {
+    const arpa = toArpa(ip);
+    const response = await dohQuery("cloudflare", arpa, "PTR");
+    const ptr = (response.Answer ?? []).map((r) => r.data.replace(/\.$/, ""));
+    return { ip, reverse_dns: ptr };
+  } catch {
+    return { ip, reverse_dns: [] };
+  }
 }
 
 // ── Schemas ────────────────────────────────────────────────────────────────
@@ -64,36 +39,8 @@ const ParamsSchema = z.object({
 
 const ResponseSchema = z
   .object({
-    query: z.object({
-      timestamp: z.string().openapi({ example: "2024-05-22T15:47:12.135Z" }),
-      overallProcessingTimeMs: z.number().openapi({ example: 114 }),
-      IPv4: z.number().openapi({ example: 1 }),
-      IPv6: z.number().openapi({ example: 0 }),
-      IPv4_CIDR: z.array(z.string()),
-      IPv6_CIDR: z.array(z.string()),
-      IPv4_reverse_found: z.string().openapi({ example: "1 / 1" }),
-      IPv6_reverse_found: z.string().openapi({ example: "0 / 0" }),
-      detectedBogons: z.number().openapi({ example: 0 }),
-      detectedDuplicates: z.number().openapi({ example: 0 }),
-    }),
-    cidrDetails: z.array(z.unknown()),
-    individualIpDetails: z.object({
-      IPv4: z.record(
-        z.string(),
-        z.object({
-          originalIp: z.string().openapi({ example: "1.1.1.1" }),
-          type: z.string().openapi({ example: "IPv4" }),
-          responsibleNsZone: z.string().openapi({ example: "1.1.1.in-addr.arpa" }),
-          primaryNameServer: z.string().openapi({ example: "alec.ns.cloudflare.com" }),
-          arpaFormat: z.string().openapi({ example: "1.1.1.1.in-addr.arpa" }),
-          reverseDns: z.string().openapi({ example: "one.one.one.one" }),
-          primaryNsProcessingTimeMs: z.number().openapi({ example: 112 }),
-        })
-      ),
-      IPv6: z.record(z.string(), z.unknown()),
-    }),
-    detectedBogons: z.array(z.unknown()),
-    detectedDuplicates: z.array(z.unknown()),
+    ip: z.string().openapi({ example: "1.1.1.1" }),
+    reverse_dns: z.array(z.string()).openapi({ example: ["one.one.one.one"] }),
   })
   .openapi("ReverseDns");
 
@@ -107,12 +54,9 @@ export const route = createRoute({
   responses: {
     200: {
       content: { "application/json": { schema: ResponseSchema } },
-      description: "Reverse DNS lookup result",
+      description: "PTR records for the IP",
     },
   },
-  description: "Reverse DNS",
-  externalDocs: {
-    description: "reversedns.io",
-    url: "https://reversedns.io/",
-  },
+  description: "Reverse DNS (PTR) lookup via Cloudflare DoH",
+  externalDocs: { description: "Cloudflare DoH", url: "https://cloudflare-dns.com" },
 });
