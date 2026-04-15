@@ -100,7 +100,7 @@ curl "https://api.cybai.re/cyber/ua"
 
 ## Data endpoints
 
-`/data/*` endpoints are restricted to known frontend origins (`tide.cybai.re`, `apero.cybai.re`, and their GitHub Pages mirrors).
+`/data/*` endpoints are restricted to known frontend origins (`tide.cybai.re`, `callot.cybai.re`, `apero.cybai.re`, and their Cloudflare Pages / GitHub Pages mirrors). `localhost`, `127.0.0.1`, `[::1]` (any port), and `null` origins (file://) are also allowed for local development.
 
 ### Tide
 
@@ -160,12 +160,12 @@ src/
 ## Running locally
 
 ```bash
-npm install
-npm run dev                          # local dev server at localhost:8787
-npx wrangler dev --remote            # dev against real D1 + KV bindings
+bun install
+bun run dev                          # local dev server at localhost:8787
+bunx wrangler dev --remote           # dev against real D1 + KV bindings
 curl "localhost:8787/__scheduled?cron=0+3+*+*+*"  # trigger cron manually
-npm run typecheck                    # TypeScript type check
-npm run deploy                       # deploy to Cloudflare
+bun run typecheck                    # TypeScript type check
+bun run deploy                       # deploy to Cloudflare
 ```
 
 ## License
