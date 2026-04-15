@@ -6,6 +6,7 @@ import {
   route as reverseDNSRoute,
 } from "../../helpers/reverse-dns";
 import { query as shodanQuery, route as shodanRoute } from "../../helpers/shodan";
+import { ipQuery as whoisQuery, ipRoute as whoisRoute } from "../../helpers/whois";
 
 export const ip = new OpenAPIHono();
 
@@ -28,6 +29,16 @@ ip.openapi(shodanRoute, async (c: any) => {
   const { ip } = c.req.valid("param");
   try {
     return c.json(await shodanQuery(ip));
+  } catch (err: any) {
+    return c.text(err.message, err.status ?? 500);
+  }
+});
+
+/* IP WHOIS */
+ip.openapi(whoisRoute, async (c: any) => {
+  const { ip } = c.req.valid("param");
+  try {
+    return c.json(await whoisQuery(ip));
   } catch (err: any) {
     return c.text(err.message, err.status ?? 500);
   }
