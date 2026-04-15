@@ -5,14 +5,7 @@ import {
   query as reverseDNSQuery,
   route as reverseDNSRoute,
 } from "../../helpers/reverse-dns";
-import {
-  IPQuery as reputationQuery,
-  IPRoute as reputationRoute,
-} from "../../helpers/reputation";
-import {
-  queryHost as urlhausHostQuery,
-  ipThreatRoute,
-} from "../../helpers/urlhaus";
+import { query as shodanQuery, route as shodanRoute } from "../../helpers/shodan";
 
 export const ip = new OpenAPIHono();
 
@@ -30,18 +23,11 @@ ip.openapi(reverseDNSRoute, async (c: any) => {
   return c.json(response);
 });
 
-/* REPUTATION */
-ip.openapi(reputationRoute, async (c: any) => {
-  const { ip } = c.req.valid("param");
-  const response = await reputationQuery(ip);
-  return c.json(response);
-});
-
-/* IP THREAT (URLhaus) */
-ip.openapi(ipThreatRoute, async (c: any) => {
+/* SHODAN INTERNETDB */
+ip.openapi(shodanRoute, async (c: any) => {
   const { ip } = c.req.valid("param");
   try {
-    return c.json(await urlhausHostQuery(ip));
+    return c.json(await shodanQuery(ip));
   } catch (err: any) {
     return c.text(err.message, err.status ?? 500);
   }

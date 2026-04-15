@@ -19,6 +19,7 @@ import { ip } from "./routes/cyber/ip";
 import { ua } from "./routes/cyber/ua";
 import { cve } from "./routes/cyber/cve";
 import { asn } from "./routes/cyber/asn";
+import { hash } from "./routes/cyber/hash";
 import { tide } from "./routes/data/tide";
 import { weather } from "./routes/data/weather";
 import { apero } from "./routes/data/apero";
@@ -73,6 +74,7 @@ app.route("/cyber/ip", ip);
 app.route("/cyber/ua", ua);
 app.route("/cyber/cve", cve);
 app.route("/cyber/asn", asn);
+app.route("/cyber/hash", hash);
 
 /* DATA ROUTES */
 app.route("/data", tide);
@@ -96,11 +98,12 @@ app.doc("/docs/json", {
   },
   servers: [{ url: homepage, description: "Production" }],
   tags: [
-    { name: "Domain", description: "Domain information (certs, DNS, WHOIS, reputation)" },
-    { name: "IP", description: "IP information (geolocation, reverse DNS, reputation)" },
+    { name: "Domain", description: "Domain information (certs, DNS, mail security)" },
+    { name: "IP", description: "IP information (geolocation, reverse DNS, Shodan InternetDB)" },
     { name: "User-Agent", description: "User-Agent parsing" },
     { name: "CVE", description: "CVE / vulnerability lookup" },
     { name: "ASN", description: "Autonomous System Number intel (BGPView)" },
+    { name: "Hash", description: "Malware hash lookup (MalwareBazaar)" },
     { name: "Tide", description: "French harbour tide data (maree.info)" },
     { name: "Weather", description: "Weather data (wttr.in)" },
     { name: "Apero", description: "Global apéritif customs by timezone" },

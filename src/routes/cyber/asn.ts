@@ -12,8 +12,7 @@ export const asn = new OpenAPIHono();
 asn.openapi(asnRoute, async (c: any) => {
   const { asn } = c.req.valid("param");
   try {
-    const { data } = await queryAsn(asn);
-    return c.json(data);
+    return c.json(await queryAsn(asn));
   } catch (err: any) {
     return c.text(err.message, err.status ?? 500);
   }
@@ -23,8 +22,7 @@ asn.openapi(asnRoute, async (c: any) => {
 asn.openapi(asnPrefixesRoute, async (c: any) => {
   const { asn } = c.req.valid("param");
   try {
-    const { data } = await queryAsnPrefixes(asn);
-    return c.json(data);
+    return c.json(await queryAsnPrefixes(asn));
   } catch (err: any) {
     return c.text(err.message, err.status ?? 500);
   }
