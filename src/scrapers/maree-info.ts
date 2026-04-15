@@ -105,7 +105,12 @@ export function extractExtraData(tideData: RawTideData): TideExtraData {
       const date = new Date(dateString);
       date.setDate(date.getDate() + dayOffset);
 
-      tide.timestamp = date.toLocaleString("fr-FR");
+      // Format as "DD/MM/YYYY HH:MM:SS" using UTC values — the naive-UTC trick
+      // stores Paris local time in the UTC slots, so we must always read UTC.
+      // toLocaleString() is intentionally avoided: its output depends on the
+      // runtime locale/timezone and varies across environments.
+      const p = (n: number) => String(n).padStart(2, "0");
+      tide.timestamp = `${p(date.getUTCDate())}/${p(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${p(date.getUTCHours())}:${p(date.getUTCMinutes())}:${p(date.getUTCSeconds())}`;
 
       if (!nowFound) {
         if (date > nowParisNaive) {
@@ -226,16 +231,18 @@ function buildTideArray(
   const firstType = inferFirstTideType(heights);
   const secondType: TideType = firstType === "high_tide" ? "low_tide" : "high_tide";
 
+  let highCount = 0;
   return times.map((time, i) => {
-    const entry: TideEntry = {
-      type: i % 2 === 0 ? firstType : secondType,
-      time,
-      high: heights[i],
-    };
-    if (i % 2 === 0) {
-      const coeff = coeffs[i / 2];
-      entry.coeff = coeff;
-      entry.coeff_label = coefficientLabel(coeff);
+    const type: TideType = i % 2 === 0 ? firstType : secondType;
+    const entry: TideEntry = { type, time, high: heights[i] };
+    // Assign coeff to high tides only, regardless of index parity.
+    // Days starting with a low tide would otherwise put coeffs on low tides.
+    if (type === "high_tide") {
+      const coeff = coeffs[highCount++];
+      if (coeff !== undefined) {
+        entry.coeff = coeff;
+        entry.coeff_label = coefficientLabel(coeff);
+      }
     }
     return entry;
   });

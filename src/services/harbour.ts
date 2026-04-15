@@ -5,15 +5,21 @@ import type { Harbour, HarbourDatabase, CloudflareEnv } from "../types";
 
 /**
  * Returns all harbours from D1 as an { id: name } map.
+ * Returns an empty object if D1 is unavailable or the table doesn't exist yet
+ * (e.g. local dev before the first migration / cron run).
  */
 export async function getHarbourDatabase(
   env: CloudflareEnv
 ): Promise<HarbourDatabase> {
-  const { results } = await env.DB.prepare(
-    `SELECT id, name FROM harbour_table;`
-  ).all<{ id: string; name: string }>();
-
-  return Object.fromEntries(results.map((r) => [r.id, r.name]));
+  if (!env.DB) return {};
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT id, name FROM harbour_table;`
+    ).all<{ id: string; name: string }>();
+    return Object.fromEntries(results.map((r) => [r.id, r.name]));
+  } catch {
+    return {}; // Table doesn't exist yet (local dev, first run)
+  }
 }
 
 /**

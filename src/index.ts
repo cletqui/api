@@ -40,6 +40,16 @@ const DATA_ORIGINS = [
   "https://cletqui.github.io/callot",
 ];
 
+// Allow localhost in any form for local development
+function isAllowedDataOrigin(origin: string): string | null {
+  if (DATA_ORIGINS.includes(origin)) return origin;
+  // file:// protocol — browsers send Origin: null
+  if (origin === "null") return origin;
+  // localhost in any form (http/https, any port, IPv4 and IPv6)
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin)) return origin;
+  return null;
+}
+
 /* APP */
 const app = new OpenAPIHono<{ Bindings: CloudflareEnv }>();
 
@@ -50,11 +60,11 @@ app.use("*", prettyJSON());
 // /cyber/* — open CORS (public API)
 app.use("/cyber/*", cors({ origin: "*", allowMethods: ["GET"] }));
 
-// /data/* — restricted to known frontends
+// /data/* — restricted to known frontends + localhost for local dev
 app.use(
   "/data/*",
   cors({
-    origin: (origin) => (DATA_ORIGINS.includes(origin) ? origin : null),
+    origin: isAllowedDataOrigin,
     allowMethods: ["GET"],
     allowHeaders: ["Content-Type"],
     maxAge: 86400,

@@ -127,13 +127,19 @@ async function applyLastTideFallback(
 /**
  * Returns all harbours from D1, refreshing the registry first if the request
  * contains a `?refresh` query parameter.
+ * Falls back to a live scrape of maree.info when D1 is empty (local dev or
+ * first run before the nightly cron has populated the table).
  */
 export async function getHarboursData(
   req: Request,
   env: CloudflareEnv
 ): Promise<HarbourDatabase> {
   await maybeRefreshHarbourRegistry(req, env);
-  return getHarbourDatabase(env);
+  const db = await getHarbourDatabase(env);
+  if (Object.keys(db).length === 0) {
+    return fetchHarboursData();
+  }
+  return db;
 }
 
 async function maybeRefreshHarbourRegistry(
