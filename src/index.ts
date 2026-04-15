@@ -35,6 +35,9 @@ const DATA_ORIGINS = [
   "https://apero.cybai.re",
   "https://apero.pages.dev",
   "https://cletqui.github.io/apero",
+  "https://callot.cybai.re",
+  "https://callot.pages.dev",
+  "https://cletqui.github.io/callot",
 ];
 
 /* APP */
