@@ -7,6 +7,7 @@ import {
 } from "../../helpers/reverse-dns";
 import { query as shodanQuery, route as shodanRoute } from "../../helpers/shodan";
 import { ipQuery as whoisQuery, ipRoute as whoisRoute } from "../../helpers/whois";
+import { query as stopForumSpamQuery, route as stopForumSpamRoute } from "../../helpers/stopforumspam";
 
 export const ip = new OpenAPIHono();
 
@@ -39,6 +40,16 @@ ip.openapi(whoisRoute, async (c: any) => {
   const { ip } = c.req.valid("param");
   try {
     return c.json(await whoisQuery(ip));
+  } catch (err: any) {
+    return c.text(err.message, err.status ?? 500);
+  }
+});
+
+/* STOPFORUMSPAM REPUTATION */
+ip.openapi(stopForumSpamRoute, async (c: any) => {
+  const { ip } = c.req.valid("param");
+  try {
+    return c.json(await stopForumSpamQuery(ip));
   } catch (err: any) {
     return c.text(err.message, err.status ?? 500);
   }
