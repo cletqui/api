@@ -2,8 +2,8 @@
 
 A single Cloudflare Worker serving two categories of public endpoints:
 
-- **`/cyber/*`** — cybersecurity intelligence: domain info, IP info, ASN, CVE lookup, user-agent parsing
-- **`/data/*`** — French tide data, weather, and apéritif customs
+- **`/cyber/*`** — cybersecurity intelligence: domain, IP, hash, ASN, CVE, user-agent, URL. Open CORS.
+- **`/data/*`** — French tide data, weather, and apéritif customs. Restricted CORS.
 
 **Base URL:** `https://api.cybai.re`  
 **Docs:** [`/docs`](https://api.cybai.re/docs) (Swagger UI) · [`/docs/json`](https://api.cybai.re/docs/json) (OpenAPI JSON)
@@ -12,73 +12,77 @@ A single Cloudflare Worker serving two categories of public endpoints:
 
 ## Cyber endpoints
 
-All `/cyber/*` endpoints return JSON and allow any origin (`Access-Control-Allow-Origin: *`).
+All `/cyber/*` endpoints return JSON with `Access-Control-Allow-Origin: *`.
 
 ### Domain
 
 | Method | Path | Description | Source |
 |--------|------|-------------|--------|
 | `GET` | `/cyber/domain/certs/{domain}` | Certificate transparency records | [crt.sh](https://crt.sh) |
-| `GET` | `/cyber/domain/subdomains/{domain}` | Subdomain enumeration via CT logs | [crt.sh](https://crt.sh) |
-| `GET` | `/cyber/domain/dns-query/{resolver}/{domain}` | DNS-over-HTTPS single record query | Cloudflare / Google / Quad9 |
 | `GET` | `/cyber/domain/nslookup/{resolver}/{domain}` | Full NS lookup (A, AAAA, CNAME, TXT, NS, MX) | Cloudflare / Google / Quad9 |
-| `GET` | `/cyber/domain/whois/{domain}` | RDAP/WHOIS registration data | [rdap.org](https://rdap.org) |
-| `GET` | `/cyber/domain/reputation/{domain}` | Threat score, tags, abuse indicators | [Spamhaus](https://www.spamhaus.org) |
-| `GET` | `/cyber/domain/mail-security/{domain}` | SPF, DMARC, DKIM, MX analysis | DoH (Cloudflare) |
-| `GET` | `/cyber/domain/threat/{domain}` | Malware distribution history | [URLhaus](https://urlhaus.abuse.ch) |
-| `GET` | `/cyber/domain/url/threat?url=` | Specific URL threat check | [URLhaus](https://urlhaus.abuse.ch) |
+| `GET` | `/cyber/domain/whois/{domain}` | RDAP/WHOIS registration data | IANA RDAP |
+| `GET` | `/cyber/domain/mail-security/{domain}` | SPF, DMARC, DKIM, MX analysis | DoH |
 
 **DNS resolvers:** `cloudflare` · `google` · `quad9`
 
 ```bash
-# Certificate transparency
 curl "https://api.cybai.re/cyber/domain/certs/example.com?exclude=expired&deduplicate=Y"
-
-# Full NS lookup via Cloudflare DoH
 curl "https://api.cybai.re/cyber/domain/nslookup/cloudflare/example.com"
-
-# Email security check
 curl "https://api.cybai.re/cyber/domain/mail-security/example.com"
-
-# URLhaus malware check
-curl "https://api.cybai.re/cyber/domain/threat/example.com"
-curl "https://api.cybai.re/cyber/domain/url/threat?url=http://malicious.example.com/payload.exe"
 ```
 
 ### IP
 
 | Method | Path | Description | Source |
 |--------|------|-------------|--------|
+| `GET` | `/cyber/ip/me` | Caller's public IP (reads `CF-Connecting-IP`) | — |
 | `GET` | `/cyber/ip/info/{ip}` | Geolocation, ISP, ASN, mobile/proxy/hosting flags | [ip-api.com](https://ip-api.com) |
-| `GET` | `/cyber/ip/reverse-dns/{ip}` | Reverse DNS lookup | [reversedns.io](https://reversedns.io) |
-| `GET` | `/cyber/ip/reputation/{ip}` | Blocklist listings (XBL, SBL, DBL…) | [Spamhaus](https://www.spamhaus.org) |
-| `GET` | `/cyber/ip/threat/{ip}` | Malware distribution history | [URLhaus](https://urlhaus.abuse.ch) |
+| `GET` | `/cyber/ip/reverse-dns/{ip}` | Reverse DNS (PTR) lookup | Cloudflare DoH |
+| `GET` | `/cyber/ip/shodan/{ip}` | Open ports, CVEs, hostnames | [Shodan InternetDB](https://internetdb.shodan.io) |
+| `GET` | `/cyber/ip/whois/{ip}` | IP WHOIS / allocation data | [RIPEstat](https://stat.ripe.net) |
+| `GET` | `/cyber/ip/reputation/{ip}` | Spam/abuse listings, Tor exit detection | [StopForumSpam](https://www.stopforumspam.com) |
 
 ```bash
+curl "https://api.cybai.re/cyber/ip/me"
 curl "https://api.cybai.re/cyber/ip/info/1.1.1.1"
 curl "https://api.cybai.re/cyber/ip/reputation/1.1.1.1"
-curl "https://api.cybai.re/cyber/ip/threat/1.2.3.4"
+curl "https://api.cybai.re/cyber/ip/shodan/1.1.1.1"
+```
+
+### Hash
+
+| Method | Path | Description | Source |
+|--------|------|-------------|--------|
+| `GET` | `/cyber/hash/{hash}` | Malware sample info — MD5, SHA-1, or SHA-256 | [MalwareBazaar](https://bazaar.abuse.ch) |
+
+```bash
+curl "https://api.cybai.re/cyber/hash/094fd325049b8a9cf6d3e5ef2a6d4cc6a567d7d49c35f8bb8dd9e3c6acf3d78d"
+```
+
+### URL
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/cyber/url/redirects?url=` | Follow redirect chain (up to 10 hops) |
+
+```bash
+curl "https://api.cybai.re/cyber/url/redirects?url=https://bit.ly/example"
 ```
 
 ### ASN
 
 | Method | Path | Description | Source |
 |--------|------|-------------|--------|
-| `GET` | `/cyber/asn/{asn}` | ASN name, country, abuse contacts, RIR allocation | [BGPView](https://bgpview.io) |
-| `GET` | `/cyber/asn/{asn}/prefixes` | IPv4/IPv6 prefix list for the ASN | [BGPView](https://bgpview.io) |
+| `GET` | `/cyber/asn/{asn}` | ASN name, country, type | [BGPView](https://bgpview.io) |
+| `GET` | `/cyber/asn/{asn}/prefixes` | IPv4/IPv6 prefix list | [BGPView](https://bgpview.io) |
 
 The `{asn}` parameter accepts `13335` or `AS13335`.
-
-```bash
-curl "https://api.cybai.re/cyber/asn/AS13335"
-curl "https://api.cybai.re/cyber/asn/AS13335/prefixes"
-```
 
 ### CVE
 
 | Method | Path | Description | Source |
 |--------|------|-------------|--------|
-| `GET` | `/cyber/cve/{id}` | Full CVE record | [MITRE CVE API](https://www.cve.org) |
+| `GET` | `/cyber/cve/{id}` | Full CVE record, CVSS score, references | [MITRE CVE API](https://www.cve.org) |
 
 ```bash
 curl "https://api.cybai.re/cyber/cve/CVE-2021-44228"
@@ -88,84 +92,66 @@ curl "https://api.cybai.re/cyber/cve/CVE-2021-44228"
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/cyber/ua?ua=` | Parse a user-agent string (falls back to request `User-Agent` header) |
-
-```bash
-curl "https://api.cybai.re/cyber/ua?ua=Mozilla/5.0+..."
-# or let the API read your own UA:
-curl "https://api.cybai.re/cyber/ua"
-```
+| `GET` | `/cyber/ua?ua=` | Parse a UA string (falls back to request `User-Agent` header) |
 
 ---
 
 ## Data endpoints
 
-`/data/*` endpoints are restricted to known frontend origins (`tide.cybai.re`, `callot.cybai.re`, `apero.cybai.re`, and their Cloudflare Pages / GitHub Pages mirrors). `localhost`, `127.0.0.1`, `[::1]` (any port), and `null` origins (file://) are also allowed for local development.
+`/data/*` is restricted to known frontend origins (`tide.cybai.re`, `callot.cybai.re`, `apero.cybai.re` and their mirrors). `localhost` and `null` (file://) are allowed for local dev.
 
 ### Tide
 
-French harbour tide data scraped from [maree.info](https://maree.info). Raw data is cached in Cloudflare KV for 12 hours; `last_tide` / `next_tide` are always computed fresh.
+French harbour tide data scraped from [maree.info](https://maree.info). Cached in KV for 12h.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/data/tide?harbour={name}` | Tide data for a harbour by name |
-| `GET` | `/data/tide?id={id}` | Tide data for a harbour by maree.info ID |
-| `GET` | `/data/tide/harbours` | Full harbour list (`id → name`) |
-| `GET` | `/data/tide/harbours?name={name}` | Search harbour by name |
-| `GET` | `/data/tide/harbours?id={id}` | Search harbour by ID |
-| `GET` | `/data/tide/harbours?refresh` | Force-sync the D1 harbour registry from maree.info |
-
-Response includes `forecast` (today), `last_tide`, `next_tide`, and a full `data` map for the week.
+| `GET` | `/data/tide?harbour={name}` | Tide data by harbour name |
+| `GET` | `/data/tide?id={id}` | Tide data by maree.info ID |
+| `GET` | `/data/tide/harbours` | Full harbour list |
+| `GET` | `/data/tide/harbours?name={name}` | Search by name |
 
 ### Weather
 
-| Method | Path | Description | Source |
-|--------|------|-------------|--------|
-| `GET` | `/data/weather?location={city}` | Weather data in wttr.in j1 format | [wttr.in](https://wttr.in) |
-
-If `location` is omitted, falls back to Cloudflare geolocation (`cf.city`).
+| Method | Path | Source |
+|--------|------|--------|
+| `GET` | `/data/weather?location={city}` | [wttr.in](https://wttr.in) |
 
 ### Apéro
 
-Global apéritif customs by timezone (~200 timezones covered).
-
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/data/apero` | Full dataset keyed by continent and city |
+| `GET` | `/data/apero` | Full dataset keyed by continent/city |
 | `GET` | `/data/apero?timezone=Europe/Paris` | Single timezone entry |
 
 ---
 
 ## Architecture
 
-Built on [Cloudflare Workers](https://workers.cloudflare.com) with [Hono](https://hono.dev) and [zod-openapi](https://github.com/honojs/middleware/tree/main/packages/zod-openapi).
+Built with [Hono](https://hono.dev) + [zod-openapi](https://github.com/honojs/middleware/tree/main/packages/zod-openapi) on Cloudflare Workers.
 
 ```
 src/
-  routes/cyber/     domain  ip  ua  cve  asn
+  routes/cyber/     domain  ip  ua  cve  asn  hash  url
   routes/data/      tide  weather  apero
-  helpers/          cyber fetchers + Zod/OpenAPI schemas
+  helpers/          cyber fetchers + Zod/OpenAPI schemas (collocated)
   services/         tide KV cache, harbour D1 registry, weather
   scrapers/         maree-info.ts  wttr-in.ts
-  types/            CloudflareEnv, tide types
-  data/             apero.json (~200 KB static dataset)
+  data/             apero.json (~200 KB)
 ```
 
-**Cloudflare bindings:**
-- `DB` — D1 database (`data-db`): harbour registry
-- `TIDE_KV` — KV namespace: 12h tide data cache + 24h last-tide fallback
-
-**Cron:** `0 3 * * *` — nightly harbour registry sync from maree.info
+**Bindings:** `DB` (D1 — harbour registry) · `TIDE_KV` (KV — 12h tide cache)  
+**Cron:** `0 3 * * *` — nightly harbour registry sync
 
 ## Running locally
 
 ```bash
 bun install
-bun run dev                          # local dev server at localhost:8787
-bunx wrangler dev --remote           # dev against real D1 + KV bindings
-curl "localhost:8787/__scheduled?cron=0+3+*+*+*"  # trigger cron manually
-bun run typecheck                    # TypeScript type check
-bun run deploy                       # deploy to Cloudflare
+bun run dev                          # localhost:8787
+bunx wrangler dev --remote           # dev against real D1 + KV
+curl "localhost:8787/__scheduled?cron=0+3+*+*+*"
+bun run typecheck
+bun run deploy
 ```
 
 ## License
