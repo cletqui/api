@@ -20,6 +20,7 @@ import { ua } from "./routes/cyber/ua";
 import { cve } from "./routes/cyber/cve";
 import { asn } from "./routes/cyber/asn";
 import { hash } from "./routes/cyber/hash";
+import { url } from "./routes/cyber/url";
 import { tide } from "./routes/data/tide";
 import { weather } from "./routes/data/weather";
 import { apero } from "./routes/data/apero";
@@ -88,6 +89,7 @@ app.route("/cyber/ua", ua);
 app.route("/cyber/cve", cve);
 app.route("/cyber/asn", asn);
 app.route("/cyber/hash", hash);
+app.route("/cyber/url", url);
 
 /* DATA ROUTES */
 app.route("/data", tide);
@@ -117,6 +119,7 @@ app.doc("/docs/json", {
     { name: "CVE", description: "CVE / vulnerability lookup" },
     { name: "ASN", description: "Autonomous System Number intel (BGPView)" },
     { name: "Hash", description: "Malware hash lookup (MalwareBazaar)" },
+    { name: "URL", description: "URL redirect chain tracing" },
     { name: "Tide", description: "French harbour tide data (maree.info)" },
     { name: "Weather", description: "Weather data (wttr.in)" },
     { name: "Apero", description: "Global apéritif customs by timezone" },
